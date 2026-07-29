@@ -4,6 +4,7 @@
 # Contributor: Renato Silva <br.renatosilva@gmail.com>
 # Contributor: wirx6 <wirx654@gmail.com>
 # Contributor: Kirill Müller <krlmlr@mailbox.org>
+# Contributor: dragon-archer <dragon-archer@outlook.com>
 
 if [[ ${CARCH} != i686 ]]; then
   _enable_ada=yes
@@ -53,7 +54,7 @@ else
   _url=https://gcc.gnu.org/pub/gcc/snapshots/${_version}-${_snapshot}
 fi
 _libdir=lib/gcc/${CHOST}/${pkgver}
-pkgrel=5
+pkgrel=6
 pkgdesc="GCC for the MinGW-w64"
 arch=('any')
 mingw_arch=('mingw32' 'mingw64' 'ucrt64')
@@ -108,7 +109,7 @@ sha256sums=('50efb4d94c3397aff3b0d61a5abd748b4dd31d9d3f2ab7be05b171d36a510f79'
             'e98805ead7d78ee2a92f237894c4b2b7ddc1688e1b517d8c04f28d440202e40f'
             'fd9bdecb2bbc4796bbc9f00b708dac42ef9e3464a06d6d27e5475cee117de5be'
             'ad1f7b5e7afaaec008b7cbd14feea13a10989fa91bda7003af72d457619bb199'
-            'd8b9b979dc1742f63d23dfca92bc05944612bd196a31fb882b8a616baba84383'
+            '21e9b6e112e3781e917de44f9ebcf8d7d4b30b15ca12d4316ac90a6f260eb931'
             'c94004dab1685a6fa9124de86aae742df4136a2e9ff5d5e1ad87ecdc35fbcef4'
             '1484911163634f30324827619c873a6267b377abba0df8bbedfd128163c53ea4'
             'a411f59953553a3d01dd64c79b1acbb91eca092c4cb01bfd26b1c51c3eb798e8'
@@ -177,11 +178,6 @@ prepare() {
   # do not expect ${prefix}/mingw symlink - this should be superceded by
   # 0005-Windows-Don-t-ignore-native-system-header-dir.patch .. but isn't!
   sed -i 's/${prefix}\/mingw\//${prefix}\//g' configure
-
-  # change hardcoded /mingw prefix to the real prefix .. isn't this rubbish?
-  # it might work at build time and could be important there but beyond that?!
-  local MINGW_NATIVE_PREFIX=$(cygpath -am ${MINGW_PREFIX})
-  sed -i "s#\\/mingw\\/#${MINGW_NATIVE_PREFIX//\//\\/}\\/#g" gcc/config/mingw/mingw32.h
 }
 
 build() {
@@ -257,8 +253,9 @@ build() {
 
   ../${_sourcedir}/configure \
     --prefix=${MINGW_PREFIX} \
-    --with-local-prefix=${MINGW_PREFIX}/local \
-    --libexecdir=${MINGW_PREFIX}/lib \
+    --with-sysroot=${MINGW_PREFIX} \
+    --with-build-sysroot=${MINGW_PREFIX} \
+    --libexecdir=lib \
     --enable-bootstrap \
     --enable-checking=release \
     --with-arch=${_arch} \
