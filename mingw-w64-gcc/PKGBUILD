@@ -4,6 +4,7 @@
 # Contributor: Renato Silva <br.renatosilva@gmail.com>
 # Contributor: wirx6 <wirx654@gmail.com>
 # Contributor: Kirill Müller <krlmlr@mailbox.org>
+# Contributor: dragon-archer <dragon-archer@outlook.com>
 
 if [[ ${CARCH} != i686 ]]; then
   _enable_ada=yes
@@ -56,7 +57,7 @@ else
   _url=https://gcc.gnu.org/pub/gcc/snapshots/${_version}-${_snapshot}
 fi
 _libdir=lib/gcc/${CHOST}/${pkgver}
-pkgrel=7
+pkgrel=8
 pkgdesc="GCC for the MinGW-w64"
 arch=('any')
 mingw_arch=('mingw32' 'mingw64' 'ucrt64')
@@ -96,7 +97,7 @@ source=(${_url}/${_sourcedir}.tar.xz{,.sig}
         0012-Handle-spaces-in-path-for-default-manifest.patch
         0014-gcc-9-branch-clone_function_name_1-Retain-any-stdcall-suffix.patch
         0020-libgomp-Don-t-hard-code-MS-printf-attributes.patch
-        0022-unset-native-system-header-dir.patch
+        0022-mingw-Remove-outdated-mingw-stuff.patch
         0023-Ada-Don-t-export-gnat1-s-symbols-on-PE-hosts.patch
         0140-gcc-diagnostic-color.patch
         0200-add-m-no-align-vector-insn-option-for-i386.patch
@@ -113,7 +114,7 @@ sha256sums=('50efb4d94c3397aff3b0d61a5abd748b4dd31d9d3f2ab7be05b171d36a510f79'
             'e98805ead7d78ee2a92f237894c4b2b7ddc1688e1b517d8c04f28d440202e40f'
             'fd9bdecb2bbc4796bbc9f00b708dac42ef9e3464a06d6d27e5475cee117de5be'
             'ad1f7b5e7afaaec008b7cbd14feea13a10989fa91bda7003af72d457619bb199'
-            'd8b9b979dc1742f63d23dfca92bc05944612bd196a31fb882b8a616baba84383'
+            'e9ff8fd2bbd688aed96b888a232d8e1a5e6463162c85919e9bb0ee6e6b50514c'
             '395dd4df29c295f917aa4a136a0aa72af34eee6320ecc2d92ee717397578398d'
             'c94004dab1685a6fa9124de86aae742df4136a2e9ff5d5e1ad87ecdc35fbcef4'
             '1484911163634f30324827619c873a6267b377abba0df8bbedfd128163c53ea4'
@@ -156,8 +157,13 @@ prepare() {
     0012-Handle-spaces-in-path-for-default-manifest.patch \
     0014-gcc-9-branch-clone_function_name_1-Retain-any-stdcall-suffix.patch \
     0020-libgomp-Don-t-hard-code-MS-printf-attributes.patch \
-    0022-unset-native-system-header-dir.patch \
     0023-Ada-Don-t-export-gnat1-s-symbols-on-PE-hosts.patch
+
+  # Avoid hardcoding /mingw or D:/M/${MINGW_PREFIX} in the final installation.
+  # Make GCC fully relocatable.
+  # See https://github.com/msys2/MINGW-packages/issues/27782 for details.
+  apply_patch_with_msg \
+    0022-mingw-Remove-outdated-mingw-stuff.patch
 
   # Enable diagnostic color under mintty
   # based on https://github.com/BurntSushi/ripgrep/issues/94#issuecomment-261761687
@@ -181,15 +187,6 @@ prepare() {
     3001-fix-codeview-crashes.patch
 
   autoreconf -fiv
-
-  # do not expect ${prefix}/mingw symlink - this should be superceded by
-  # 0005-Windows-Don-t-ignore-native-system-header-dir.patch .. but isn't!
-  sed -i 's/${prefix}\/mingw\//${prefix}\//g' configure
-
-  # change hardcoded /mingw prefix to the real prefix .. isn't this rubbish?
-  # it might work at build time and could be important there but beyond that?!
-  local MINGW_NATIVE_PREFIX=$(cygpath -am ${MINGW_PREFIX})
-  sed -i "s#\\/mingw\\/#${MINGW_NATIVE_PREFIX//\//\\/}\\/#g" gcc/config/mingw/mingw32.h
 }
 
 build() {
@@ -265,9 +262,12 @@ build() {
   # In addition adaint.c does `#include <accctrl.h>` which pulls in msxml.h, hacky hack:
   CPPFLAGS+=" -DCOM_NO_WINDOWS_H"
 
+  # NATIVE_SYSTEM_HEADER_DIR will be prefixed with sysroot, so don't add ${MINGW_PREFIX} here.
   ../${_sourcedir}/configure \
     --prefix=${MINGW_PREFIX} \
-    --with-local-prefix=${MINGW_PREFIX}/local \
+    --with-sysroot=${MINGW_PREFIX} \
+    --with-local-prefix=${MINGW_PREFIX} \
+    --with-native-system-header-dir=/include \
     --libexecdir=${MINGW_PREFIX}/lib \
     --enable-bootstrap \
     --enable-checking=release \
@@ -312,8 +312,14 @@ build() {
   fi
 
   # https://gcc.gnu.org/onlinedocs/gccint/Makefile.html
-  make -O STAGE1_CFLAGS="-O2" \
-          profiledbootstrap
+  # Relocatable GCC can't find system headers and/or objects as it was mislocated during bootstrap.
+  # Use environment variables to point to the correct location of the system headers and objects.
+  # See https://github.com/msys2/MINGW-packages/issues/27782 for details.
+  MSYS2_ARG_CONV_EXCL='-D' \
+  CPATH="$(cygpath -am "${MINGW_PREFIX}/include")" \
+  LIBRARY_PATH="$(cygpath -am "${MINGW_PREFIX}/lib")" \
+    make -O STAGE1_CFLAGS="-O2" \
+            profiledbootstrap
 }
 
 package_gcc-libs() {
@@ -545,7 +551,12 @@ package_gcc-plugin() {
 
   cd "${srcdir}"/build-${MSYSTEM}
 
-  make -C gcc DESTDIR="${pkgdir}" install-plugin
+  # gengtype.exe and some other tools are built at installation, so also need env vars.
+  # See build() for more details.
+  MSYS2_ARG_CONV_EXCL='-D' \
+  CPATH="$(cygpath -am "${MINGW_PREFIX}/include")" \
+  LIBRARY_PATH="$(cygpath -am "${MINGW_PREFIX}/lib")" \
+    make -C gcc DESTDIR="${pkgdir}" install-plugin
 }
 
 package_gcc-rust() {
