@@ -97,6 +97,7 @@ source=(${_url}/${_sourcedir}.tar.xz{,.sig}
         0012-Handle-spaces-in-path-for-default-manifest.patch
         0014-gcc-9-branch-clone_function_name_1-Retain-any-stdcall-suffix.patch
         0020-libgomp-Don-t-hard-code-MS-printf-attributes.patch
+        0021-bootstrap-gnattools-Pass-target-sysroot-flags-to-boo.patch
         0022-mingw-Remove-outdated-mingw-stuff.patch
         0023-Ada-Don-t-export-gnat1-s-symbols-on-PE-hosts.patch
         0140-gcc-diagnostic-color.patch
@@ -114,6 +115,7 @@ sha256sums=('50efb4d94c3397aff3b0d61a5abd748b4dd31d9d3f2ab7be05b171d36a510f79'
             'e98805ead7d78ee2a92f237894c4b2b7ddc1688e1b517d8c04f28d440202e40f'
             'fd9bdecb2bbc4796bbc9f00b708dac42ef9e3464a06d6d27e5475cee117de5be'
             'ad1f7b5e7afaaec008b7cbd14feea13a10989fa91bda7003af72d457619bb199'
+            'be1431cb434d3ffd7f9ac7e298cab1a1e4821b0a5116e7a19a61687175357f77'
             'e9ff8fd2bbd688aed96b888a232d8e1a5e6463162c85919e9bb0ee6e6b50514c'
             '395dd4df29c295f917aa4a136a0aa72af34eee6320ecc2d92ee717397578398d'
             'c94004dab1685a6fa9124de86aae742df4136a2e9ff5d5e1ad87ecdc35fbcef4'
@@ -163,6 +165,7 @@ prepare() {
   # Make GCC fully relocatable.
   # See https://github.com/msys2/MINGW-packages/issues/27782 for details.
   apply_patch_with_msg \
+    0021-bootstrap-gnattools-Pass-target-sysroot-flags-to-boo.patch \
     0022-mingw-Remove-outdated-mingw-stuff.patch
 
   # Enable diagnostic color under mintty
@@ -316,8 +319,6 @@ build() {
   # Use environment variables to point to the correct location of the system headers and objects.
   # See https://github.com/msys2/MINGW-packages/issues/27782 for details.
   MSYS2_ARG_CONV_EXCL='-D' \
-  CPATH="$(cygpath -am "${MINGW_PREFIX}/include")" \
-  LIBRARY_PATH="$(cygpath -am "${MINGW_PREFIX}/lib")" \
     make -O STAGE1_CFLAGS="-O2" \
             profiledbootstrap
 }
@@ -554,8 +555,6 @@ package_gcc-plugin() {
   # gengtype.exe and some other tools are built at installation, so also need env vars.
   # See build() for more details.
   MSYS2_ARG_CONV_EXCL='-D' \
-  CPATH="$(cygpath -am "${MINGW_PREFIX}/include")" \
-  LIBRARY_PATH="$(cygpath -am "${MINGW_PREFIX}/lib")" \
     make -C gcc DESTDIR="${pkgdir}" install-plugin
 }
 
