@@ -57,7 +57,7 @@ else
   _url=https://gcc.gnu.org/pub/gcc/snapshots/${_version}-${_snapshot}
 fi
 _libdir=lib/gcc/${CHOST}/${pkgver}
-pkgrel=3
+pkgrel=4
 pkgdesc="The GNU Compiler Collection (mingw-w64)"
 arch=('any')
 mingw_arch=('mingw32' 'mingw64' 'ucrt64')
@@ -219,6 +219,8 @@ build() {
     local _arch=nocona
   fi
 
+  local _bootstrap_config="bootstrap-O3"
+
   local _languages="c,c++"
   if [ "$_enable_ada" == "yes" ]; then
     _languages+=",ada"
@@ -243,6 +245,10 @@ build() {
   fi
   if [ "$_enable_jit" == "yes" ]; then
     _languages+=",jit"
+  fi
+
+  if [ -n "$_bootstrap_config" ]; then
+    _extra_config+=("--with-build-config=${_bootstrap_config}")
   fi
 
   # so libgomp DLL gets built despide static libdl
