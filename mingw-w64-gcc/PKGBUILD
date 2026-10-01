@@ -616,7 +616,7 @@ package_libatomic() {
   depends=("${MINGW_PACKAGE_PREFIX}-libwinpthread")
   conflicts=("${MINGW_PACKAGE_PREFIX}-gcc-libs<16.2.0-4")
 
-  _install
+  # _install # for package-grokker
   _install_RLE
 }
 
