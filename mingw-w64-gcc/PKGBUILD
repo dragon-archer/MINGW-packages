@@ -250,7 +250,7 @@ build() {
   if [ "$_enable_lto" == "yes" ]; then
     _languages+=",lto"
     if [ "$_enable_lto_bootstrap" == "yes" ]; then
-      _extra_config+=("--with-build-config=bootstrap-lto-lean")
+      _extra_config+=("--with-build-config=bootstrap-O3")
     fi
   else
     _extra_config+=("--disable-lto")
